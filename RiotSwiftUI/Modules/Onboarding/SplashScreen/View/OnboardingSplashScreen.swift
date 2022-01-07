@@ -27,10 +27,15 @@ struct OnboardingSplashScreen: View {
     
     @State private var overlayFrame: CGRect = .zero
     @State private var pageTimer: Timer?
+    @State private var dragOffset: CGFloat = .zero
     
     // MARK: Public
     
     @ObservedObject var viewModel: OnboardingSplashScreenViewModel.Context
+    
+    var pageCount: Int {
+        viewModel.viewState.content.count
+    }
     
     var buttons: some View {
         VStack {
@@ -48,7 +53,7 @@ struct OnboardingSplashScreen: View {
     
     var overlay: some View {
         VStack {
-            OnboardingSplashScreenPageIndicator(pageCount: viewModel.viewState.content.count,
+            OnboardingSplashScreenPageIndicator(pageCount: pageCount,
                                                 pageIndex: viewModel.pageIndex)
                 .padding(.vertical, 20)
             
@@ -59,44 +64,85 @@ struct OnboardingSplashScreen: View {
     
     var body: some View {
         GeometryReader { geometry in
-            // FIXME: The PageTabViewStyle breaks the safe area - replace with ScrollView or custom offsets
-            TabView(selection: $viewModel.pageIndex) {
-                OnboardingSplashScreenPage(content: viewModel.viewState.content[viewModel.viewState.content.count - 1],
-                                           overlayHeight: overlayFrame.height + geometry.safeAreaInsets.bottom)
-                    .tag(-1)
-                
-                ForEach(0..<viewModel.viewState.content.count, id:\.self) { index in
-                    let pageContent = viewModel.viewState.content[index]
-                    OnboardingSplashScreenPage(content: pageContent,
+            ZStack(alignment: .bottomLeading) {
+                HStack(spacing: 0) {
+                    OnboardingSplashScreenPage(content: viewModel.viewState.content[pageCount - 1],
                                                overlayHeight: overlayFrame.height + geometry.safeAreaInsets.bottom)
-                        .tag(index)
-                }
-            }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .ignoresSafeArea()
-            .overlay(overlay
-                        .background(ViewFrameReader(frame: $overlayFrame))
-                        .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16),
-                     alignment: .bottom)
-            .accentColor(theme.colors.accent)
-            .onAppear {
-                pageTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { timer in
-                    if viewModel.pageIndex == viewModel.viewState.content.count - 1 {
-                        viewModel.send(viewAction: .hiddenPage)
-                        
-                        withAnimation {
-                            viewModel.send(viewAction: .nextPage)
-                        }
-                    } else {
-                        withAnimation {
-                            viewModel.send(viewAction: .nextPage)
-                        }
+                        .frame(width: geometry.size.width)
+                        .tag(-1)
+                    
+                    ForEach(0..<pageCount, id:\.self) { index in
+                        let pageContent = viewModel.viewState.content[index]
+                        OnboardingSplashScreenPage(content: pageContent,
+                                                   overlayHeight: overlayFrame.height + geometry.safeAreaInsets.bottom)
+                            .frame(width: geometry.size.width)
+                            .tag(index)
                     }
+                }
+                .offset(x: (CGFloat(viewModel.pageIndex + 1) * -geometry.size.width) + dragOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged {
+                            stopTimer()
+                            
+                            if viewModel.pageIndex == 0 && $0.translation.width > 0 {
+                                return
+                            } else if viewModel.pageIndex == pageCount - 1 && $0.translation.width < 0 {
+                                return
+                            }
+                            dragOffset = $0.translation.width
+                        }
+                        .onEnded { value in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                if dragOffset < -geometry.size.width / 3 {
+                                    viewModel.send(viewAction: .nextPage)
+                                } else if dragOffset > geometry.size.width / 3 {
+                                    viewModel.send(viewAction: .previousPage)
+                                }
+                                
+                                dragOffset = 0
+                                startTimer()
+                            }
+                        }
+                )
+                
+                overlay
+                    .frame(width: geometry.size.width)
+                    .background(ViewFrameReader(frame: $overlayFrame))
+                    .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16)
+            }
+        }
+        .background(theme.colors.background.ignoresSafeArea())  // whilst gradients are transparent
+        .accentColor(theme.colors.accent)
+        .navigationBarHidden(true)
+        .onAppear {
+            startTimer()
+        }
+    }
+    
+    private func startTimer() {
+        guard pageTimer == nil else { return }
+        
+        pageTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { timer in
+            if viewModel.pageIndex == pageCount - 1 {
+                viewModel.send(viewAction: .hiddenPage)
+                
+                withAnimation(.easeInOut(duration: 0.7)) {
+                    viewModel.send(viewAction: .nextPage)
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 0.7)) {
+                    viewModel.send(viewAction: .nextPage)
                 }
             }
         }
-        .navigationBarHidden(true)
-        .background(theme.colors.background.ignoresSafeArea())
+    }
+    
+    private func stopTimer() {
+        guard let pageTimer = pageTimer else { return }
+        
+        self.pageTimer = nil
+        pageTimer.invalidate()
     }
 }
 
