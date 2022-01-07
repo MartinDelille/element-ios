@@ -23,7 +23,11 @@ struct OnboardingSplashScreen: View {
     
     // MARK: Private
     
-    @Environment(\.theme) private var theme: ThemeSwiftUI
+    @Environment(\.theme) private var theme
+    @Environment(\.layoutDirection) private var layoutDirection
+    
+    private var isLeftToRight: Bool { layoutDirection == .leftToRight }
+    private var pageCount: Int { viewModel.viewState.content.count }
     
     @State private var overlayFrame: CGRect = .zero
     @State private var pageTimer: Timer?
@@ -32,10 +36,6 @@ struct OnboardingSplashScreen: View {
     // MARK: Public
     
     @ObservedObject var viewModel: OnboardingSplashScreenViewModel.Context
-    
-    var pageCount: Int {
-        viewModel.viewState.content.count
-    }
     
     var buttons: some View {
         VStack {
@@ -83,14 +83,10 @@ struct OnboardingSplashScreen: View {
                 .gesture(
                     DragGesture()
                         .onChanged {
-                            stopTimer()
+                            guard shouldSwipeForTranslation($0.translation.width) else { return }
                             
-                            if viewModel.pageIndex == 0 && $0.translation.width > 0 {
-                                return
-                            } else if viewModel.pageIndex == pageCount - 1 && $0.translation.width < 0 {
-                                return
-                            }
-                            dragOffset = $0.translation.width
+                            stopTimer()
+                            dragOffset = isLeftToRight ? $0.translation.width : -$0.translation.width
                         }
                         .onEnded { value in
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -115,9 +111,18 @@ struct OnboardingSplashScreen: View {
         .background(theme.colors.background.ignoresSafeArea())  // whilst gradients are transparent
         .accentColor(theme.colors.accent)
         .navigationBarHidden(true)
-        .onAppear {
-            startTimer()
+        .onAppear { startTimer() }
+        .onDisappear { stopTimer() }
+    }
+    
+    private func shouldSwipeForTranslation(_ width: CGFloat) -> Bool {
+        if viewModel.pageIndex == 0  {
+            return isLeftToRight ? width < 0 : width > 0
+        } else if viewModel.pageIndex == pageCount - 1 {
+            return isLeftToRight ? width > 0 : width < 0
         }
+        
+        return true
     }
     
     private func startTimer() {
@@ -153,5 +158,6 @@ struct OnboardingSplashScreen_Previews: PreviewProvider {
     static let stateRenderer = MockOnboardingSplashScreenScreenState.stateRenderer
     static var previews: some View {
         stateRenderer.screenGroup()
+//            .environment(\.layoutDirection, .rightToLeft)
     }
 }
