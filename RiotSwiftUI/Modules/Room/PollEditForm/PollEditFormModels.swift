@@ -17,11 +17,20 @@
 import Foundation
 import SwiftUI
 
-struct PollDetails {
-    let type: PollEditFormType
+enum EditFormPollType {
+    case disclosed
+    case undisclosed
+}
+
+struct EditFormPollDetails {
+    let type: EditFormPollType
     let question: String
     let answerOptions: [String]
     let maxSelections: UInt = 1
+    
+    static var `default`: EditFormPollDetails {
+        EditFormPollDetails(type: .disclosed, question: "", answerOptions: ["", ""])
+    }
 }
 
 enum PollEditFormMode {
@@ -37,7 +46,7 @@ enum PollEditFormStateAction {
 
 enum PollEditFormViewAction {
     case addAnswerOption
-    case deleteAnswerOption(PollEditFormAnswerOption)
+    case deleteAnswerOption(EditFormPollAnswerOption)
     case cancel
     case create
     case update
@@ -45,16 +54,11 @@ enum PollEditFormViewAction {
 
 enum PollEditFormViewModelResult {
     case cancel
-    case create(PollDetails)
-    case update(PollDetails)
+    case create(EditFormPollDetails)
+    case update(EditFormPollDetails)
 }
 
-enum PollEditFormType {
-    case disclosed
-    case undisclosed
-}
-
-struct PollEditFormQuestion {
+struct EditFormPollQuestion {
     var text: String {
         didSet {
             text = String(text.prefix(maxLength))
@@ -64,7 +68,7 @@ struct PollEditFormQuestion {
     let maxLength: Int
 }
 
-struct PollEditFormAnswerOption: Identifiable, Equatable {
+struct EditFormPollAnswerOption: Identifiable, Equatable {
     let id = UUID()
 
     var text: String {
@@ -94,9 +98,9 @@ struct PollEditFormViewState: BindableState {
 }
 
 struct PollEditFormViewStateBindings {
-    var question: PollEditFormQuestion
-    var answerOptions: [PollEditFormAnswerOption]
-    var type: PollEditFormType
+    var question: EditFormPollQuestion
+    var answerOptions: [EditFormPollAnswerOption]
+    var type: EditFormPollType
     
     var alertInfo: PollEditFormErrorAlertInfo?
 }

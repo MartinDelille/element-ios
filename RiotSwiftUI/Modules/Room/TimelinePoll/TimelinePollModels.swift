@@ -68,7 +68,8 @@ class TimelinePoll {
          closed: Bool,
          totalAnswerCount: UInt,
          type: TimelinePollType,
-         maxAllowedSelections: UInt, hasBeenEdited: Bool) {
+         maxAllowedSelections: UInt,
+         hasBeenEdited: Bool) {
         self.question = question
         self.answerOptions = answerOptions
         self.closed = closed
@@ -80,6 +81,14 @@ class TimelinePoll {
     
     var hasCurrentUserVoted: Bool {
         answerOptions.filter { $0.selected == true}.count > 0
+    }
+    
+    var shouldDiscloseResults: Bool {
+        if closed {
+            return totalAnswerCount > 0
+        } else {
+            return type == .disclosed && totalAnswerCount > 0 && hasCurrentUserVoted
+        }
     }
 }
 
